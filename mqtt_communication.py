@@ -1,43 +1,50 @@
-import paho.mqtt.client as mqtt
-from flask import Flask, render_template, request
-app = Flask(__name__)
-
-mqttc=mqtt.Client()
-mqttc.connect("localhost",1883,60)
-mqttc.loop_start()
-
-pins = {
-   4 : {'name' : 'GPIO 4', 'board' : 'esp8266', 'topic' : 'esp8266/4', 'state' : 'False'},
-   5 : {'name' : 'GPIO 5', 'board' : 'esp8266', 'topic' : 'esp8266/5', 'state' : 'False'}
-   }
-
-# Put the pin dictionary into the template data dictionary:
-templateData = {
-   'pins' : pins
-   }
-
-@app.route("/")
-def main():
-   return render_template('main.html', **templateData)
-
-@app.route("/<board>/<changePin>/<action>")
-
-def action(board, changePin, action):
-   changePin = int(changePin)
-   devicePin = pins[changePin]['name']
-   if action == "1" and board == 'esp8266':
-      mqttc.publish(pins[changePin]['topic'],"1")
-      pins[changePin]['state'] = 'True'
-
-   if action == "0" and board == 'esp8266':
-      mqttc.publish(pins[changePin]['topic'],"0")
-      pins[changePin]['state'] = 'False'
-
-   templateData = {
-      'pins' : pins
-   }
-
-   return render_template('main.html', **templateData)
-
-if __name__ == "__main__":
-   app.run(host='0.0.0.0', port=8181, debug=True) 
+import paho.mqtt.client as mqttClient
+import time
+ 
+def on_connect(client, userdata, flags, rc):
+ 
+    if rc == 0:
+ 
+        print("Connected to server")
+ 
+        global Connected                #Use global variable
+        Connected = True                #Signal connection 
+ 
+    else:
+ 
+        print("Connection failed")
+ 
+def on_message(client, userdata, message):
+    msg = message.payload
+    msg = msg.decode("utf-8")
+    print("Package received: "  + msg)
+ 
+Connected = False   #global variable for the state of the connection
+ 
+broker_address= 'farmer.cloudmqtt.com'  #Broker address
+port = 17014                         #Broker port
+user = "mggxilrp"                    #Connection username
+password = "5zBND5VHiieI"            #Connection password
+ 
+client = mqttClient.Client("Receiver")               #create new instance
+client.username_pw_set(user, password=password)    #set username and password
+client.on_connect= on_connect                      #attach function to callback
+client.on_message= on_message                      #attach function to callback
+ 
+client.connect(broker_address, port=port)          #connect to broker
+ 
+client.loop_start()        #start the loop
+ 
+while Connected != True:    #Wait for connection
+    time.sleep(0.1)
+ 
+client.subscribe("testgrill")
+ 
+try:
+    while True:
+        time.sleep(1)
+ 
+except KeyboardInterrupt:
+    print("exiting")
+    client.disconnect()
+    client.loop_stop()
